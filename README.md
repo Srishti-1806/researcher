@@ -36,63 +36,64 @@ The system follows a multi-stage pipeline:
 
 ```mermaid
 graph TD
-    Start([Input: SMILES or IUPAC]) --> Guard[Input Guard / Sanitization]
-    Guard --> PreProc[Chemical Preprocessor]
 
-    subgraph Knowledge_Retrieval
-        PreProc --> Embed[Embedding Model]
-        Embed --> Vector[(Vector DB: Chemical Data / Past Queries)]
-    end
+Start([Input: SMILES or IUPAC]) --> Guard[Input Guard / Sanitization]
+Guard --> PreProc[Chemical Preprocessor]
 
-    Vector --> Classify{Intent Classifier}
+subgraph Knowledge Retrieval
+    PreProc --> Embed[Embedding Model]
+    Embed --> Vector[(Vector DB: Chemical Data / Past Queries)]
+end
 
-    Classify -- OffTopic --> End([Reject or Clarify])
-    Classify -- Quick_Query --> Tools[Search Tools (Tavily / Web)]
-    Classify -- Deep_Chemical_Query --> Deep[Deep Mode Orchestrator]
+Vector --> Classify{Intent Classifier}
 
-    subgraph Neural_Translation
-        Deep --> Tokenizer[SMILES or IUPAC Tokenizer]
-        Tokenizer --> Model{{Transformer Translation Model}}
-        Model --> RawOutput[Raw Translation Output]
-    end
+Classify -- Off topic --> End([Reject or Clarify])
+Classify -- Quick query --> Tools[Search Tools Tavily or Web]
+Classify -- Deep chemical query --> Deep[Deep Mode Orchestrator]
 
-    RawOutput --> Validity{RDKit Validity Check}
+subgraph Neural Translation
+    Deep --> Tokenizer[SMILES or IUPAC Tokenizer]
+    Tokenizer --> Model[Transformer Translation Model]
+    Model --> RawOutput[Raw Translation Output]
+end
 
-    Validity -- Invalid --> Retry[Beam Search / Temperature Retry]
-    Retry --> Model
+RawOutput --> Validity{RDKit Validity Check}
 
-    Validity -- Valid --> Confidence[Confidence Scoring Engine]
+Validity -- Invalid --> Retry[Beam Search or Temperature Retry]
+Retry --> Model
 
-    subgraph Confidence_Loop
-        Confidence --> Score{Confidence >= 0.8}
-        Score -- No --> Iterate[Refinement Iteration]
-        Iterate --> Model
-    end
+Validity -- Valid --> Confidence[Confidence Scoring Engine]
 
-    Score -- Yes --> CrossCheck[Bi-Directional Translation]
+subgraph Confidence Loop
+    Confidence --> Score{Confidence >= 0.8}
+    Score -- No --> Iterate[Refinement Iteration]
+    Iterate --> Model
+end
 
-    subgraph Verification
-        CrossCheck --> Reverse[Translate Back]
-        Reverse --> Similarity[Tanimoto or String Similarity]
-    end
+Score -- Yes --> CrossCheck[Bi Directional Translation]
 
-    Similarity --> Verify{Similarity >= 0.9}
+subgraph Verification
+    CrossCheck --> Reverse[Translate Back]
+    Reverse --> Similarity[Tanimoto or String Similarity]
+end
 
-    subgraph Deep_Research_Loop
-        Tools --> Research[Tavily Deep Search]
-        Research --> Evidence[Evidence Aggregation]
-    end
+Similarity --> Verify{Similarity >= 0.9}
 
-    Verify -- Low --> Research
-    Evidence --> Formatter
+subgraph Deep Research Loop
+    Tools --> Research[Tavily Deep Search]
+    Research --> Evidence[Evidence Aggregation]
+end
 
-    Verify -- High --> Formatter
+Verify -- Low --> Research
+Verify -- High --> Formatter
 
-    Formatter[Output Formatter]
+Evidence --> Formatter
 
-    Formatter --> Metrics[Update Benchmarks]
-    Formatter --> Memory[(Save to Vector DB)]
-    Formatter --> End([Final Molecule Output])
+Formatter[Output Formatter]
+
+Formatter --> Metrics[Update Accuracy Benchmarks]
+Formatter --> Memory[(Save to Vector DB)]
+Formatter --> End([Final Molecule Output])
 ```
 
 
