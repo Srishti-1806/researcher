@@ -1,0 +1,150 @@
+{
+  "canonicalization": [
+    {
+      "input": "CC(C)C",
+      "expected": "CC(C)C",
+      "output": "CC(C)C",
+      "success": true
+    },
+    {
+      "input": "C(C)(C)C",
+      "expected": "CC(C)C",
+      "output": "CC(C)C",
+      "success": true
+    },
+    {
+      "input": "CCO",
+      "expected": "CCO",
+      "output": "CCO",
+      "success": true
+    },
+    {
+      "input": "OCC",
+      "expected": "CCO",
+      "output": "CCO",
+      "success": true
+    }
+  ],
+  "similarity": [
+    {
+      "smiles1": "CC(C)C",
+      "smiles2": "CC(C)C",
+      "similarity": 1.0,
+      "expected_range": 1.0,
+      "success": true
+    },
+    {
+      "smiles1": "CCO",
+      "smiles2": "CCO",
+      "similarity": 1.0,
+      "expected_range": 1.0,
+      "success": true
+    },
+    {
+      "smiles1": "CC(C)C",
+      "smiles2": "CCC",
+      "similarity": 0.6666666666666666,
+      "expected_range": 0.5,
+      "success": false
+    }
+  ],
+  "validation": [
+    {
+      "type": "SMILES",
+      "input": "CC(C)C",
+      "valid": true,
+      "expected": true,
+      "success": true
+    },
+    {
+      "type": "SMILES",
+      "input": "invalid",
+      "valid": false,
+      "expected": false,
+      "success": true
+    },
+    {
+      "type": "SMILES",
+      "input": "CCO",
+      "valid": true,
+      "expected": true,
+      "success": true
+    },
+    {
+      "type": "SMILES",
+      "input": "C(C)(C)c",
+      "valid": false,
+      "expected": false,
+      "success": true
+    },
+    {
+      "type": "IUPAC",
+      "input": "2-methylpropane",
+      "valid": true,
+      "expected": true,
+      "success": true
+    },
+    {
+      "type": "IUPAC",
+      "input": "ethane",
+      "valid": true,
+      "expected": true,
+      "success": true
+    },
+    {
+      "type": "IUPAC",
+      "input": "",
+      "valid": false,
+      "expected": false,
+      "success": true
+    },
+    {
+      "type": "IUPAC",
+      "input": "abc",
+      "valid": true,
+      "expected": false,
+      "success": false
+    }
+  ],
+  "benchmark": [
+    {
+      "test_case": {
+        "input": "CC(C)C",
+        "input_format": "SMILES",
+        "expected_output": "2-methylpropane",
+        "output_format": "IUPAC"
+      },
+      "output": "2-Methylpropane",
+      "inference_time": 0.18278932571411133,
+      "valid": true,
+      "similarity": 1.0,
+      "success": true
+    },
+    {
+      "test_case": {
+        "input": "CCO",
+        "input_format": "SMILES",
+        "expected_output": "ethanol",
+        "output_format": "IUPAC"
+      },
+      "output": "Ethanol",
+      "inference_time": 0.13700580596923828,
+      "valid": true,
+      "similarity": 1.0,
+      "success": true
+    },
+    {
+      "test_case": {
+        "input": "ethane",
+        "input_format": "IUPAC",
+        "expected_output": "CC",
+        "output_format": "SMILES"
+      },
+      "output": "CC",
+      "inference_time": 0.10202169418334961,
+      "valid": true,
+      "similarity": 1.0,
+      "success": true
+    }
+  ]
+}

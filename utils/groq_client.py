@@ -2,15 +2,27 @@ import os
 import requests
 import time
 from config import Config
-from tenacity import retry, stop_after_attempt, wait_exponential, RetryError
+from tenacity import retry, stop_after_attempt, wait_exponential, RetryError, retry_if_exception_type
 
 
-@retry(wait=wait_exponential(multiplier=1, min=4, max=10), stop=stop_after_attempt(5))
+@retry(wait=wait_exponential(multiplier=1, min=4, max=60), stop=stop_after_attempt(3), retry=retry_if_exception_type((requests.exceptions.RequestException, requests.exceptions.Timeout)))
 def call_groq_api(url, json_payload, headers):
     """Make HTTP request to Groq API with automatic retry on rate limit (429) and transient errors."""
-    resp = requests.post(url, json=json_payload, headers=headers, timeout=30)
-    resp.raise_for_status()
-    return resp
+    try:
+        resp = requests.post(url, json=json_payload, headers=headers, timeout=30)
+        resp.raise_for_status()
+        return resp
+    except requests.exceptions.HTTPError as e:
+        if resp.status_code == 429:
+            # Rate limit - wait longer
+            time.sleep(5)
+            raise e
+        elif resp.status_code >= 500:
+            # Server error - retry
+            raise e
+        else:
+            # Client error - don't retry
+            raise e
 
 
 class GroqClient:

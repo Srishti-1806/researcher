@@ -8,8 +8,17 @@ from fastembed.embedding import DefaultEmbedding
 
 class MemoryManager:
     def __init__(self):
-        # Initialize Qdrant client with local storage
-        self.client = QdrantClient(path=Config.QDRANT_PATH)
+        # Initialize Qdrant client - prefer server over local storage
+        qdrant_url = os.getenv("QDRANT_URL", "http://localhost:6333")
+        try:
+            # Try to connect to Qdrant server
+            self.client = QdrantClient(url=qdrant_url)
+            print(f"✅ Connected to Qdrant server at {qdrant_url}")
+        except Exception as e:
+            print(f"⚠️  Could not connect to Qdrant server ({e}), falling back to local storage")
+            # Fallback to local storage
+            self.client = QdrantClient(path=Config.QDRANT_PATH)
+        
         self.collection_name = "research_memory"
         self.embedding_model = DefaultEmbedding(model_name="BAAI/bge-small-en-v1.5")
         

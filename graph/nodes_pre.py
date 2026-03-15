@@ -4,6 +4,7 @@ from memory import memory
 from utils.groq_client import get_llm
 import uuid
 import sys
+import re
 
 # Initialize a simple Groq client wrapper
 # Acquire LLM (Groq if configured, otherwise DummyLLM fallback)
@@ -11,18 +12,67 @@ llm = get_llm()
 print(f"✅ LLM initialized: {getattr(llm, 'model', 'unknown')}")
 
 def guard_layer(state: AgentState):
-    """
-    Guard Budget and Token and telemetry.
-    Initializes the state if needed.
-    """
+    """Input Guard / Sanitization and state initialization."""
     return {
-        "token_usage": 0, 
-        "budget_limit": 5000, 
-        "research_data": [], 
-        "gaps": [], 
+        "token_usage": 0,
+        "budget_limit": Config.MAX_TOKENS_PER_QUERY,
+        "research_data": [],
+        "gaps": [],
         "iterations": 0,
         "history": state.get("history", []),
-        "query_id": str(uuid.uuid4())  # Generate unique ID for streaming
+        "query_id": str(uuid.uuid4()),  # Generate unique ID for streaming
+    }
+
+
+def chemical_preprocessor(state: AgentState):
+    """Sanitize the query and detect whether it is a SMILES or IUPAC string."""
+    raw = state.get("query", "") or ""
+    sanitized = " ".join(raw.strip().split())
+
+    # Guess input format using simple heuristics
+    input_format = "IUPAC"
+    if "smiles" in sanitized.lower() or any(c in sanitized for c in "=#@/\\[]"):
+        input_format = "SMILES"
+
+    # Allow explicit labels like "SMILES: ..." or "IUPAC: ..."
+    match = re.search(r"(?:SMILES|smiles|IUPAC|iupac)\s*[:\-]?\s*(['\"]?)([^'\"]+)\1", sanitized)
+    if match:
+        sanitized = match.group(2).strip()
+
+    # Default output format is the opposite
+    output_format = "IUPAC" if input_format == "SMILES" else "SMILES"
+
+    return {
+        "sanitized_query": sanitized,
+        "input_format": input_format,
+        "output_format": output_format,
+        "input_value": sanitized,
+    }
+
+
+def embed_query(state: AgentState):
+    """Generate an embedding for the sanitized query for later vector DB retrieval."""
+    query = state.get("sanitized_query", state.get("query", ""))
+    try:
+        # Use the same embedding model as MemoryManager for consistency
+        embeddings = list(memory.embedding_model.embed([query]))
+        query_embedding = embeddings[0] if embeddings else None
+    except Exception as e:
+        print(f"⚠️ Error embedding query: {e}")
+        query_embedding = None
+
+    return {"query_embedding": query_embedding}
+
+
+def vector_retrieval(state: AgentState):
+    """Retrieve context from the vector DB (past queries, chemical data)."""
+    query = state.get("sanitized_query", state.get("query", ""))
+    context_docs = memory.get_context(query)
+    formatted_context = "\n".join(context_docs) if context_docs else "No prior context found."
+
+    return {
+        "context": [formatted_context],
+        "vector_hits": context_docs,
     }
 
 def context_retrieval(state: AgentState):
@@ -38,22 +88,29 @@ def context_retrieval(state: AgentState):
     return {"context": [formatted_context]}
 
 def intent_classifier(state: AgentState):
-    """
-    Intent classifier clarification Orchestrator.
-    Determines if the query is clear and what the intent is.
+    """Classify the intent of the query.
+
+    Categories:
+    - OffTopic: Not a chemical / molecule conversion query.
+    - Quick_Query: Simple factual question (use quick web search).
+    - Deep_Chemical_Query: Requires SMILES/IUPAC translation / deep validation.
     """
     if not llm:
         print("⚠️ Error: LLM (Groq) not available.")
         return {
-            "intent": "Error",
+            "intent": "OffTopic",
             "is_clarified": False,
             "token_usage": 0
         }
 
+    query = state.get("sanitized_query", state.get("query", ""))
     prompt_text = (
-        "Classify the following query into one of these categories: Research, Bug Fix, Architecture, General Question. "
-        "Also determine if the query is clear (True/False). Return the output as 'Category: <category>, Clear: <True/False>'.\n\n"
-        f"Query: {state['query']}"
+        "Classify the following query into one of: OffTopic, Quick_Query, Deep_Chemical_Query.\n"
+        "- OffTopic: unrelated to chemical structure conversion or chemistry knowledge.\n"
+        "- Quick_Query: a quick factual question answerable with a web search.\n"
+        "- Deep_Chemical_Query: requires SMILES/IUPAC translation or chemistry reasoning.\n"
+        "Return ONLY: Intent: <category>\n\n"
+        f"Query: {query}"
     )
 
     try:
@@ -61,40 +118,25 @@ def intent_classifier(state: AgentState):
     except Exception as e:
         print(f"⚠️ Error calling Groq API: {e}")
         return {
-            "intent": "Error",
+            "intent": "OffTopic",
             "is_clarified": False,
             "token_usage": 0
         }
 
-    # Track tokens (estimate)
     tokens_used = len(str(response).split()) * 2
-
     content = str(response).strip()
-    print(f"DEBUG intent_classifier - LLM raw response: '{content}'")
-    
-    # Simple parsing
-    intent = "Research"
-    is_clarified = True
-    
-    print(f"DEBUG intent_classifier - Checking for Clear: False or false in content...")
-    if "Clear: False" in content or "false" in content.lower():
-        print(f"DEBUG intent_classifier - Found Clear: False or false, setting is_clarified to False")
-        is_clarified = False
-    else:
-        print(f"DEBUG intent_classifier - Did not find Clear: False or false, keeping is_clarified as True")
-    
-    # Extract intent
-    if "Bug Fix" in content: intent = "Bug Fix"
-    elif "Architecture" in content: intent = "Architecture"
-    elif "General Question" in content: intent = "General Question"
-    
-    result = {
-        "intent": intent, 
-        "is_clarified": is_clarified,
+    intent = "OffTopic"
+
+    if "Deep_Chemical_Query" in content or "deep" in content.lower():
+        intent = "Deep_Chemical_Query"
+    elif "Quick_Query" in content or "quick" in content.lower():
+        intent = "Quick_Query"
+
+    return {
+        "intent": intent,
+        "is_clarified": intent != "OffTopic",
         "token_usage": state.get("token_usage", 0) + tokens_used
     }
-    print(f"DEBUG intent_classifier returning: {result}")
-    return result
 
 
 def clarification_node(state: AgentState):

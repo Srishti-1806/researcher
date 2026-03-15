@@ -11,7 +11,7 @@ def test_agent():
         sys.exit(1)
 
     # Test Query
-    query = "What are the recent advancements in AI research in 2026?"
+    query = "What is the Smile representation of 2,3-dimethylbutane and how does it compare to the structure of Mamba Transformer?"
     print(f"🔍 Testing Query: '{query}'")
     
     initial_state = {
@@ -40,7 +40,10 @@ def test_agent():
     print("="*40 + "\n")
 
     # Assertions
-    required_steps = ["guard", "context", "classify", "planner", "deep_research", "gap_analysis", "synthesize", "formatter"]
+    required_steps = [
+        "guard", "preprocess", "embed", "vector", "classify", "planner",
+        "deep_research", "gap_analysis", "synthesize", "formatter"
+    ]
     missing_steps = [step for step in required_steps if step not in steps_completed]
     
     if not missing_steps:

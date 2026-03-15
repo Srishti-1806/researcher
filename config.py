@@ -9,7 +9,7 @@ class Config:
     # --- Model Configuration: Groq API ---
     GROQ_MODEL_NAME = os.getenv("GROQ_MODEL_NAME", "llama-3.1-8b-instant")
     GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-    GROQ_API_URL = os.getenv("GROQ_API_URL", "https://api.groq.com/v1/models/openai/v1/chat/completions")
+    GROQ_API_URL = os.getenv("GROQ_API_URL", "https://api.groq.com/openai/v1/chat/completions")
     # Backwards-compatible alias used elsewhere in the code
     MODEL_NAME = GROQ_MODEL_NAME
 
@@ -19,6 +19,7 @@ class Config:
     
     # --- API Keys ---
     TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
+    QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
     
     # --- Phase 1: Budget & Constraints ---
     MAX_TOKENS_PER_QUERY = 5000 

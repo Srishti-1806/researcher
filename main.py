@@ -9,15 +9,23 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Import node functions
-from graph.nodes_pre import guard_layer, context_retrieval, intent_classifier
+from graph.nodes_pre import (
+    guard_layer,
+    chemical_preprocessor,
+    embed_query,
+    vector_retrieval,
+    intent_classifier,
+    clarification_node,
+)
 from graph.nodes_exec import (
-    planner_router, 
-    quick_mode_executor, 
+    planner_router,
+    quick_mode_executor,
     deep_mode_orchestrator,
     gap_analysis_node,
-    structured_synthesis_node
+    structured_synthesis_node,
 )
 from graph.nodes_post import format_output
+
 
 def build_agent():
     """Compiles the Phase 1-4 logic into a LangGraph workflow."""
@@ -25,8 +33,11 @@ def build_agent():
 
     # --- Phase 1: Pre-Processing ---
     workflow.add_node("guard", guard_layer)
-    workflow.add_node("context", context_retrieval)
+    workflow.add_node("preprocess", chemical_preprocessor)
+    workflow.add_node("embed", embed_query)
+    workflow.add_node("vector", vector_retrieval)
     workflow.add_node("classify", intent_classifier)
+    workflow.add_node("clarification_node", clarification_node)
 
     # --- Phase 2: Planning ---
     workflow.add_node("planner", planner_router)
@@ -42,23 +53,16 @@ def build_agent():
 
     # --- Define Logic Flow (Edges) ---
     workflow.set_entry_point("guard")
-    workflow.add_edge("guard", "context")
-    workflow.add_edge("context", "classify")
+    workflow.add_edge("guard", "preprocess")
+    workflow.add_edge("preprocess", "embed")
+    workflow.add_edge("embed", "vector")
+    workflow.add_edge("vector", "classify")
 
-    # Intent Router: If intent is "Error", end. Otherwise, proceed to Planner.
+    # Intent Router: OffTopic -> Clarify / End, otherwise -> Planner
     def intent_route(state):
-        print(f"DEBUG intent_route - Full state keys: {state.keys()}")
-        print(f"DEBUG intent_route - intent: {state.get('intent', 'NOT SET')}")
-        print(f"DEBUG intent_route - is_clarified: {state.get('is_clarified', 'NOT SET')}")
-        
-        intent = state.get("intent", "Error")
-        print(f"DEBUG intent_route - Final intent value: {intent}")
-        
-        # Only END if there's an error. Otherwise, route to planner.
-        if intent == "Error":
-            print(f"DEBUG intent_route - Routing to: END (error)")
-            return END
-        print(f"DEBUG intent_route - Routing to: planner")
+        intent = state.get("intent", "OffTopic")
+        if intent == "OffTopic":
+            return "clarification_node"
         return "planner"
 
     workflow.add_conditional_edges("classify", intent_route)
@@ -71,11 +75,11 @@ def build_agent():
 
     # Deep Mode Loop: Research -> Analyze -> (Loop or Synthesize)
     workflow.add_edge("deep_research", "gap_analysis")
-    
+
     def gap_route(state):
         confidence = state.get("confidence_score", 0.0)
         iterations = state.get("iterations", 0)
-        if confidence < 0.8 and iterations < 3:
+        if confidence < Config.CONFIDENCE_THRESHOLD and iterations < Config.MAX_ITERATIONS_DEEP_MODE:
             return "deep_research"
         return "synthesize"
 
@@ -84,6 +88,7 @@ def build_agent():
     # Close the paths to Formatter
     workflow.add_edge("quick_mode", "formatter")
     workflow.add_edge("synthesize", "formatter")
+    workflow.add_edge("clarification_node", END)
     workflow.add_edge("formatter", END)
 
     return workflow.compile()
