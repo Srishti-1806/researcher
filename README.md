@@ -36,7 +36,6 @@ Input Query → Guard Layer → Preprocessing → Intent Classification → Exec
 
 ```mermaid
 graph TD
-<<<<<<< HEAD
 
 Start([Input: SMILES or IUPAC]) --> Guard[Input Guard / Sanitization]
 Guard --> PreProc[Chemical Preprocessor]
@@ -95,15 +94,12 @@ Formatter[Output Formatter]
 Formatter --> Metrics[Update Accuracy Benchmarks]
 Formatter --> Memory[(Save to Vector DB)]
 Formatter --> End([Final Molecule Output])
-```
-=======
+
     A[User Input] --> B[Guard Layer]
     B --> C[Chemical Preprocessor]
     C --> D[Query Embedding]
     D --> E[Vector Retrieval]
     E --> F[Intent Classifier]
->>>>>>> 946d395 (origin main)
-
     F --> G{Intent Type}
     G -->|OffTopic| H[Clarification Node]
     G -->|Quick Query| I[Quick Mode]
